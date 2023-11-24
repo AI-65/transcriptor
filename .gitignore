@@ -12,3 +12,6 @@ __pycache__/
 # Secret credentials
 client_secret.json
 token.json
+activate_venv.txt
+
+.env

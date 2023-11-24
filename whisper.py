@@ -1,56 +1,68 @@
-from pathlib import Path
-import openai
+import sys
+import os
+from pydub import AudioSegment
+from openai import OpenAI
 from config import load_configuration
+import openai
 
 # Load OpenAI API key from configuration
 openai.api_key = load_configuration()
 
-def speech_to_text(file_path):
-    try:
-        with open(file_path, "rb") as audio_file:
-            transcript_response = openai.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file
-            )
+def split_audio(file_path):
+    """Splits the audio file into chunks of less than 25 MB each."""
+    audio = AudioSegment.from_file(file_path)
+    chunks = []
+    chunk_length_ms = 10 * 60 * 1000  # 10 minutes in milliseconds
 
-        # Debugging: Print the response type and content
-        print("Response Type:", type(transcript_response))
-        print("Raw Response:", transcript_response)
+    for i in range(0, len(audio), chunk_length_ms):
+        chunk = audio[i:i + chunk_length_ms]
+        chunk_name = f"{file_path}_part_{i // chunk_length_ms}.mp3"
+        chunk.export(chunk_name, format="mp3")
+        chunks.append(chunk_name)
 
-        # Extract text in a more robust manner
-        if hasattr(transcript_response, 'text'):
-            return transcript_response.text
-        elif 'text' in transcript_response:
-            return transcript_response['text']
-        else:
-            print("Transcription failed or text field missing in response")
-            return None
+    return chunks
 
-    except Exception as e:
-        print(f"Error in speech_to_text: {e}")
-        return None
+def transcribe_audio(file_path):
+    """Transcribes the audio file using OpenAI's Whisper model."""
+    client = OpenAI()
+    with open(file_path, "rb") as audio_file:
+        transcript = client.audio.transcriptions.create(
+            model="whisper-1", 
+            file=audio_file, 
+            response_format="text"
+        )
+    return transcript
 
-def write_transcript(file_path, transcript):
-    txt_file_path = file_path.with_suffix('.txt')
-    try:
-        with open(txt_file_path, 'w') as f:
-            f.write(transcript)
-        print(f"Transcription saved to {txt_file_path}")
-    except Exception as e:
-        print(f"Error writing transcript to {txt_file_path}: {e}")
+def process_directory(directory):
+    """Processes each audio file in the directory."""
+    for filename in os.listdir(directory):
+        if filename.endswith(('.mp3', '.wav')):
+            file_path = os.path.join(directory, filename)
+            file_size = os.path.getsize(file_path)
 
-def main():
-    audio_files_dir = input("Enter the folder path: ")
-    file_format = input("Enter the preferred audio file format (e.g., mp3, wav): ")
-
-    for file_path in Path(audio_files_dir).glob(f'*.{file_format}'):
-        transcript = speech_to_text(file_path)
-        print(f"Transcript received: {transcript}")  # Debugging print
-
-        if transcript:
-            write_transcript(file_path, transcript)
-        else:
-            print(f"Failed to transcribe {file_path}")
+            if file_size > 25 * 1024 * 1024:  # 25 MB in bytes
+                print(f"Splitting {filename}...")
+                chunks = split_audio(file_path)
+                full_transcript = ""
+                for chunk in chunks:
+                    transcript = transcribe_audio(chunk)
+                    full_transcript += transcript
+                    os.remove(chunk)  # Cleanup chunk file
+                with open(f"{file_path}.txt", "w") as text_file:
+                    text_file.write(full_transcript)
+            else:
+                transcript = transcribe_audio(file_path)
+                with open(f"{file_path}.txt", "w") as text_file:
+                    text_file.write(transcript)
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) != 2:
+        print("Usage: python script.py <directory>")
+        sys.exit(1)
+
+    directory = sys.argv[1]
+    if not os.path.isdir(directory):
+        print("Error: Directory does not exist.")
+        sys.exit(1)
+
+    process_directory(directory)
