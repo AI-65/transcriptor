@@ -29,17 +29,18 @@ def split_audio(file_path):
     return chunks
 
 def transcribe_audio(file_path):
-    """Transcribes the audio file using OpenAI's Whisper model."""
+
     if openai_api_key is None:
         raise ValueError("OpenAI API key is not set. Please set the key using set_openai_key.")
 
+    # Transcribes the audio file using the OpenAI API
     with open(file_path, "rb") as audio_file:
         transcript = openai.audio.transcriptions.create(
             model="whisper-1", 
             file=audio_file, 
             response_format="text"
         )
-    return transcript['text']  # Update based on the actual response structure
+    return transcript['text']  # Extracting the text from the response
 
 
 def process_directory(directory):
