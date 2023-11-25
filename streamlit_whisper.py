@@ -10,7 +10,7 @@ openai.api_key = None
 
 def set_openai_key(key):
     """Set the OpenAI API key."""
-    global openai_api_key
+    global openai.api_key
     openai.api_key = key
     openai.api_key = key
 
@@ -30,7 +30,7 @@ def split_audio(file_path):
 
 def transcribe_audio(file_path):
 
-    if openai_api_key is None:
+    if openai.api_key is None:
         raise ValueError("OpenAI API key is not set. Please set the key using set_openai_key.")
 
     # Transcribes the audio file using the OpenAI API
