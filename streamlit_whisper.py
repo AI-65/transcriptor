@@ -6,12 +6,12 @@ from openai import OpenAI
 import openai
 
 # Global variable for OpenAI API key
-openai_api_key = None
+openai.api_key = None
 
 def set_openai_key(key):
     """Set the OpenAI API key."""
     global openai_api_key
-    openai_api_key = key
+    openai.api_key = key
     openai.api_key = key
 
 def split_audio(file_path):
